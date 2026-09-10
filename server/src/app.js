@@ -95,6 +95,7 @@ app.post("/api/attempts/:id/submit", async (req, res) => {
       tradeoffs
     } = req.body;
 
+    // Deterministic validation
     if (
       !assumptions?.trim() ||
       !classes?.trim() ||
@@ -102,10 +103,11 @@ app.post("/api/attempts/:id/submit", async (req, res) => {
       !explanation?.trim()
     ) {
       return res.status(400).json({
-        message: "All required sections must be completed"
+        message: "Please complete all required sections."
       });
     }
 
+    // Save submission FIRST
     attemptRepository.saveSubmission(
       attempt.id,
       {
@@ -117,6 +119,7 @@ app.post("/api/attempts/:id/submit", async (req, res) => {
       }
     );
 
+    // Mark submitted
     attemptRepository.updateAttemptStatus(
       attempt.id,
       "SUBMITTED"
@@ -134,15 +137,23 @@ app.post("/api/attempts/:id/submit", async (req, res) => {
       tradeoffs
     };
 
+    // Evaluation starts
     attemptRepository.updateAttemptStatus(
       attempt.id,
       "EVALUATING"
     );
 
-    let evaluation;
+    // IMPORTANT:
+    // Send response immediately.
+    res.status(202).json({
+      attemptId: attempt.id,
+      status: "EVALUATING",
+      message: "Your design has been submitted and is being evaluated."
+    });
 
+    // Evaluate in background
     try {
-      evaluation = await evaluator.evaluate(
+      const evaluation = await evaluator.evaluate(
         problem,
         submission
       );
@@ -157,32 +168,32 @@ app.post("/api/attempts/:id/submit", async (req, res) => {
         "COMPLETED"
       );
 
-      res.json({
-        attemptId: attempt.id,
-        status: "COMPLETED",
-        evaluation
-      });
+      console.log(
+        `Attempt ${attempt.id} evaluation completed`
+      );
+
     } catch (evaluationError) {
+
+      console.error(
+        `Evaluation failed for attempt ${attempt.id}:`,
+        evaluationError
+      );
+
       attemptRepository.updateAttemptStatus(
         attempt.id,
         "FAILED"
       );
-
-      res.status(500).json({
-        message: "Evaluation failed",
-        attemptId: attempt.id,
-        status: "FAILED"
-      });
     }
+
   } catch (error) {
+
     console.error(error);
 
     res.status(500).json({
-      message: "Something went wrong"
+      message: "Something went wrong while submitting."
     });
   }
 });
-
 app.get("/api/attempts", (req, res) => {
   const attempts = db.prepare(`
     SELECT

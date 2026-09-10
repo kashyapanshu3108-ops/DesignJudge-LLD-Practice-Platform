@@ -25,24 +25,30 @@ function Practice() {
   }
 
   async function handleSubmit(event) {
-    event.preventDefault();
+  event.preventDefault();
 
-    setLoading(true);
+  if (loading) return;
 
-    try {
-      await submitAttempt(id, form);
+  setLoading(true);
 
-      navigate(`/feedback/${id}`);
-    } catch (error) {
-      alert(
-        error.response?.data?.message ||
-        "Submission failed"
-      );
-    } finally {
-      setLoading(false);
-    }
+  try {
+    const response = await submitAttempt(id, form);
+
+    navigate(`/feedback/${id}`, {
+      state: {
+        status: response.data.status
+      }
+    });
+
+  } catch (error) {
+    alert(
+      error.response?.data?.message ||
+      "Submission failed"
+    );
+
+    setLoading(false);
   }
-
+}
   return (
     <main className="container">
       <h1>Design your solution</h1>
@@ -104,11 +110,12 @@ function Practice() {
           />
         </label>
 
-        <button disabled={loading}>
-          {loading
-            ? "Evaluating..."
-            : "Submit Design"}
-        </button>
+        <button
+  type="submit"
+  disabled={loading}
+>
+  {loading ? "Submitting..." : "Submit Design"}
+</button>
       </form>
     </main>
   );
